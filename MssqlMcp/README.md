@@ -1,7 +1,7 @@
 # MCP Server for SQL Server
 
-## Note for Running
-Use the Node version. It currently requires a version of Node prior to v24, I am using "nvm" to manage my Node versions and run it with v23.11.0. If you run it with anything newer it errors out at startup.
+## Rob's Notes for Running
+The server can be run under dotnet or Node, use the Node runtime, that is what I fixed. It currently requires a version of Node prior to v24, I am using "nvm" to manage my Node versions and run it with v23.11.0. If you run it with anything newer it errors out at startup.
 
 ## Environment Variables to Set
 ### SQL Authentication
