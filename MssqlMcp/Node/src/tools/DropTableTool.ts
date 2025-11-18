@@ -27,10 +27,13 @@ export class DropTableTool implements Tool {
         message: `Table '${tableName}' dropped successfully.`
       };
     } catch (error) {
-      console.error("Error dropping table:", error);
+      // Log actual error to stderr for debugging
+      console.error('[DropTableTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to drop table: ${error}`
+        message: "Failed to drop table. Verify the table exists and has no dependencies. Check server logs for details."
       };
     }
   }

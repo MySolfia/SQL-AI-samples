@@ -30,20 +30,68 @@ let globalAccessToken: string | null = null;
 let globalTokenExpiresOn: Date | null = null;
 
 // Function to create SQL config with fresh access token, returns token and expiry
-export async function createSqlConfig(): Promise<{ config: sql.config, token: string, expiresOn: Date }> {
+export async function createSqlConfig(): Promise<{ config: sql.config, token: string | null, expiresOn: Date | null }> {
+  const serverName = process.env.SERVER_NAME;
+  const databaseName = process.env.DATABASE_NAME;
+  const sqlUsername = process.env.SQL_USERNAME;
+  const sqlPassword = process.env.SQL_PASSWORD;
+  const trustServerCertificate = process.env.TRUST_SERVER_CERTIFICATE?.toLowerCase() === 'true';
+  const connectionTimeout = process.env.CONNECTION_TIMEOUT ? parseInt(process.env.CONNECTION_TIMEOUT, 10) : 30;
+
+  if (!serverName || !databaseName) {
+    throw new Error('SERVER_NAME and DATABASE_NAME environment variables are required');
+  }
+
+  // Auto-detect authentication method based on environment variables
+  const hasSqlUsername = !!sqlUsername;
+  const hasSqlPassword = !!sqlPassword;
+
+  // Validate SQL credentials if provided
+  if (hasSqlUsername !== hasSqlPassword) {
+    throw new Error('Both SQL_USERNAME and SQL_PASSWORD must be provided together for SQL Authentication');
+  }
+
+  // Use SQL Authentication if credentials are provided
+  if (hasSqlUsername && hasSqlPassword) {
+    // Validate credentials are non-empty
+    if (!sqlUsername.trim() || !sqlPassword.trim()) {
+      throw new Error('SQL_USERNAME and SQL_PASSWORD must be non-empty strings');
+    }
+
+    console.error('Using SQL Authentication');
+
+    const config: sql.config = {
+      server: serverName,
+      database: databaseName,
+      user: sqlUsername,
+      password: sqlPassword,
+      options: {
+        encrypt: true,
+        trustServerCertificate: trustServerCertificate,
+      },
+      connectionTimeout: connectionTimeout * 1000, // convert seconds to milliseconds
+    };
+
+    return {
+      config,
+      token: null, // No token for SQL auth
+      expiresOn: null // No expiry for SQL auth
+    };
+  }
+
+  // Use Azure AD Authentication (existing flow)
+  console.error('Using Azure AD Authentication');
+
   const credential = new InteractiveBrowserCredential({
     redirectUri: 'http://localhost'
     // disableAutomaticAuthentication : true
   });
   const accessToken = await credential.getToken('https://database.windows.net/.default');
 
-  const trustServerCertificate = process.env.TRUST_SERVER_CERTIFICATE?.toLowerCase() === 'true';
-  const connectionTimeout = process.env.CONNECTION_TIMEOUT ? parseInt(process.env.CONNECTION_TIMEOUT, 10) : 30;
-
   return {
     config: {
-      server: process.env.SERVER_NAME!,
-      database: process.env.DATABASE_NAME!,
+      server: serverName,
+      database: databaseName,
       options: {
         encrypt: true,
         trustServerCertificate
@@ -138,8 +186,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
   } catch (error) {
+    // Log error for debugging
+    console.error('Tool execution error:', error instanceof Error ? error.message : String(error));
+
+    // Return generic error to client
     return {
-      content: [{ type: "text", text: `Error occurred: ${error}` }],
+      content: [{ type: "text", text: "An error occurred while executing the database operation. Check server logs for details." }],
       isError: true,
     };
   }
@@ -164,28 +216,70 @@ runServer().catch((error) => {
 // Connect to SQL only when handling a request
 
 async function ensureSqlConnection() {
-  // If we have a pool and it's connected, and the token is still valid, reuse it
-  if (
-    globalSqlPool &&
-    globalSqlPool.connected &&
-    globalAccessToken &&
-    globalTokenExpiresOn &&
-    globalTokenExpiresOn > new Date(Date.now() + 2 * 60 * 1000) // 2 min buffer
-  ) {
-    return;
+  const usingSqlAuth = !!process.env.SQL_USERNAME;
+
+  if (usingSqlAuth) {
+    // SQL Authentication: no token refresh needed, just check connection
+    if (globalSqlPool && globalSqlPool.connected) {
+      return;
+    }
+
+    // Need to establish connection
+    try {
+      const { config } = await createSqlConfig();
+
+      // Close old pool if exists
+      if (globalSqlPool && globalSqlPool.connected) {
+        await globalSqlPool.close();
+      }
+
+      globalSqlPool = await sql.connect(config);
+    } catch (error) {
+      // Sanitize error message - remove potential credentials
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const sanitized = errorMsg
+        .replace(/password[^;,\s]*/gi, 'password=***')
+        .replace(/pwd[^;,\s]*/gi, 'pwd=***');
+
+      // Log sanitized error to stderr for debugging
+      console.error('SQL Authentication connection failed:', sanitized);
+
+      // Return generic error to caller (no information disclosure)
+      throw new Error('Database connection failed. Verify SQL_USERNAME, SQL_PASSWORD, and server connectivity.');
+    }
+  } else {
+    // Azure AD Authentication: check token validity and refresh if needed
+    if (
+      globalSqlPool &&
+      globalSqlPool.connected &&
+      globalAccessToken &&
+      globalTokenExpiresOn &&
+      globalTokenExpiresOn > new Date(Date.now() + 2 * 60 * 1000) // 2 min buffer
+    ) {
+      return;
+    }
+
+    // Get a new token and reconnect
+    try {
+      const { config, token, expiresOn } = await createSqlConfig();
+      globalAccessToken = token;
+      globalTokenExpiresOn = expiresOn;
+
+      // Close old pool if exists
+      if (globalSqlPool && globalSqlPool.connected) {
+        await globalSqlPool.close();
+      }
+
+      globalSqlPool = await sql.connect(config);
+    } catch (error) {
+      // Log sanitized error to stderr
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('Azure AD Authentication failed:', errorMsg);
+
+      // Return generic error to caller
+      throw new Error('Database connection failed. Verify Azure AD authentication and server connectivity.');
+    }
   }
-
-  // Otherwise, get a new token and reconnect
-  const { config, token, expiresOn } = await createSqlConfig();
-  globalAccessToken = token;
-  globalTokenExpiresOn = expiresOn;
-
-  // Close old pool if exists
-  if (globalSqlPool && globalSqlPool.connected) {
-    await globalSqlPool.close();
-  }
-
-  globalSqlPool = await sql.connect(config);
 }
 
 // Patch all tool handlers to ensure SQL connection before running

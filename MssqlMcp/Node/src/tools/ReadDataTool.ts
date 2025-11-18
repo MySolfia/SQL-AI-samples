@@ -241,17 +241,13 @@ export class ReadDataTool implements Tool {
       };
       
     } catch (error) {
-      console.error("Error executing query:", error);
-      
-      // Don't expose internal error details to prevent information leakage
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      const safeErrorMessage = errorMessage.includes('Invalid object name') 
-        ? errorMessage 
-        : 'Database query execution failed';
-      
+      // Log actual error to stderr for debugging
+      console.error('[ReadDataTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to execute query: ${safeErrorMessage}`,
+        message: "Failed to read data. Verify your query syntax and permissions. Check server logs for details.",
         error: 'QUERY_EXECUTION_FAILED'
       };
     }

@@ -33,10 +33,13 @@ export class ListTableTool implements Tool {
         items: result.recordset,
       };
     } catch (error) {
-      console.error("Error listing tables:", error);
+      // Log actual error to stderr for debugging
+      console.error('[ListTableTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to list tables: ${error}`,
+        message: "Failed to list tables. Check server logs for details.",
       };
     }
   }

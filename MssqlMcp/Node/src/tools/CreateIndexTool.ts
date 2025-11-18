@@ -57,10 +57,13 @@ export class CreateIndexTool implements Tool {
         }
       };
     } catch (error) {
-      console.error("Error creating index:", error);
+      // Log actual error to stderr for debugging
+      console.error('[CreateIndexTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to create index: ${error}`,
+        message: "Failed to create index. Verify your index definition and table structure. Check server logs for details.",
       };
     }
   }

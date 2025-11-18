@@ -54,10 +54,13 @@ export class UpdateDataTool implements Tool {
         rowsAffected: result.rowsAffected[0],
       };
     } catch (error) {
-      console.error("Error updating data:", error);
+      // Log actual error to stderr for debugging
+      console.error('[UpdateDataTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to update data ${query ? ` with '${query}'` : ''}: ${error}`,
+        message: "Failed to update data. Verify your query syntax and permissions. Check server logs for details.",
       };
     }
   }

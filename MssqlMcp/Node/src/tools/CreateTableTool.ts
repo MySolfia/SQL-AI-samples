@@ -39,10 +39,13 @@ export class CreateTableTool implements Tool {
         message: `Table '${tableName}' created successfully.`
       };
     } catch (error) {
-      console.error("Error creating table:", error);
+      // Log actual error to stderr for debugging
+      console.error('[CreateTableTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to create table: ${error}`
+        message: "Failed to create table. Verify your SQL syntax. Check server logs for details."
       };
     }
   }

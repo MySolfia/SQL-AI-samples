@@ -131,10 +131,13 @@ IMPORTANT RULES:
         };
       }
     } catch (error) {
-      console.error("Error inserting data:", error);
+      // Log actual error to stderr for debugging
+      console.error('[InsertDataTool] execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to insert data: ${error}`,
+        message: "Failed to insert data. Verify your SQL syntax and data constraints. Check server logs for details.",
       };
     }
   }

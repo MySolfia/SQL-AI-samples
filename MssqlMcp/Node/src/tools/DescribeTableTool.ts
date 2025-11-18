@@ -26,9 +26,13 @@ export class DescribeTableTool implements Tool {
         columns: result.recordset,
       };
     } catch (error) {
+      // Log actual error to stderr for debugging
+      console.error('DescribeTableTool execution error:', error instanceof Error ? error.message : String(error));
+
+      // Return generic error to MCP client (no information disclosure)
       return {
         success: false,
-        message: `Failed to describe table: ${error}`,
+        message: "Failed to describe table. Verify the table exists and you have permissions. Check server logs for details.",
       };
     }
   }
