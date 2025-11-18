@@ -6,19 +6,21 @@ Use the Node version. It currently requires a version of Node prior to v24, I am
 ## Environment Variables to Set
 ### SQL Authentication
 
-  Set these environment variables:
-  SQL_USERNAME=your_username
-  SQL_PASSWORD=your_password
-  SERVER_NAME=your-server.database.windows.net
-  DATABASE_NAME=your_database
-  TRUST_SERVER_CERTIFICATE=true
-  READONLY=true
+Set these environment variables:
+- SQL_USERNAME=your_username
+- SQL_PASSWORD=your_password
+- SERVER_NAME=your-server.database.windows.net
+- DATABASE_NAME=your_database
+- TRUST_SERVER_CERTIFICATE=true
+- READONLY=true
 
 ### Azure AD Authentication (default)
 
-  Simply don't set SQL_USERNAME and SQL_PASSWORD:
-  SERVER_NAME=your-server.database.windows.net
-  DATABASE_NAME=your_database
+Simply don't set SQL_USERNAME and SQL_PASSWORD:
+- SERVER_NAME=your-server.database.windows.net
+- DATABASE_NAME=your_database
+- TRUST_SERVER_CERTIFICATE=true
+- READONLY=true
 
 ## Example of the command to add this MCP server to your setup. Replace the path etc of course.
 
